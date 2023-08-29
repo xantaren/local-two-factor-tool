@@ -62,7 +62,7 @@ def main():
                     otp_entry = data["otpauth"][selection_int - 1]
                     totp = get_totp(otp_entry["url"])
                     pyperclip.copy(totp.now())
-                    print(f'Copied {totp.now()} for {otp_entry["name"]}')
+                    print(f'Copied {totp.now()} for {otp_entry["name"]} to clipboard')
                     valid_input = True
                 elif selection_int == 0:
                     print("exiting...")
