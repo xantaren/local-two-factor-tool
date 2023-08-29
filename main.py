@@ -48,6 +48,7 @@ def main():
         data = json.load(credential_json_file)
 
         print("Please select which two-factor code to copy:")
+        print(f'0) Exit')
         for i, otp_entry in enumerate(data["otpauth"], start=1):
             print(f'{i}) {otp_entry["name"]}')
 
@@ -63,6 +64,9 @@ def main():
                     pyperclip.copy(totp.now())
                     print(f'Copied {totp.now()} for {otp_entry["name"]}')
                     valid_input = True
+                elif selection_int == 0:
+                    print("exiting...")
+                    exit(0)
                 else:
                     print("Invalid input, please try again")
             except ValueError:
