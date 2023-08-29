@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os.path
 import urllib.parse
 
 import pyotp
@@ -40,7 +41,10 @@ def get_totp(otp_url: str) -> pyotp.TOTP | None:
 
 
 def main():
-    with open('/path/to/credentials/credentials.json') as credential_json_file:
+    parent_dir = os.path.dirname(__file__)
+    credential_path = os.path.join(parent_dir, "credentials.json")
+
+    with open(credential_path) as credential_json_file:
         data = json.load(credential_json_file)
 
         print("Please select which two-factor code to copy:")
