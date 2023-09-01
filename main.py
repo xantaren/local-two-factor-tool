@@ -1,8 +1,9 @@
+import tkinter as tk
+from tkinter import messagebox, ttk
 import hashlib
 import json
 import os.path
 import urllib.parse
-
 import pyotp
 import pyperclip
 
@@ -15,7 +16,7 @@ def get_algorithms() -> dict:
     }
 
 
-def get_totp(otp_url: str) -> pyotp.TOTP | None:
+def get_totp(otp_url: str) -> any:
     parsed_url = urllib.parse.urlparse(otp_url)
     query_params = urllib.parse.parse_qs(parsed_url.query)
 
@@ -25,7 +26,7 @@ def get_totp(otp_url: str) -> pyotp.TOTP | None:
         issuer = query_params['issuer'][0]
         secret_key = query_params['secret'][0]
     except KeyError:
-        print("Error: issuer and secret must both be present")
+        messagebox.showerror("Error", "corrupt data, issuer and secret must both be present")
         return None
 
     try:
@@ -40,6 +41,21 @@ def get_totp(otp_url: str) -> pyotp.TOTP | None:
     return totp
 
 
+def copy_totp_top_clipboard(selected_entry):
+    totp = get_totp(selected_entry["url"])
+    if totp:
+        pyperclip.copy(totp.now())
+        messagebox.showinfo("Copy Complete", f'Copied {totp.now()} for {selected_entry["name"]} to clipboard')
+
+
+def on_select(data, listbox):
+    selection = listbox.curselection()
+    if selection:
+        selected_index = selection[0]
+        selected_entry = data["otpauth"][int(selected_index)]
+        copy_totp_top_clipboard(selected_entry)
+
+
 def main():
     parent_dir = os.path.dirname(__file__)
     credential_path = os.path.join(parent_dir, "credentials.json")
@@ -47,30 +63,42 @@ def main():
     with open(credential_path) as credential_json_file:
         data = json.load(credential_json_file)
 
-        print("Please select which two-factor code to copy:")
-        print(f'0) Exit')
-        for i, otp_entry in enumerate(data["otpauth"], start=1):
-            print(f'{i}) {otp_entry["name"]}')
+    root = tk.Tk()
+    root.title("OTP Manager")
+    root.geometry("400x350")  # Set the initial window size
 
-        valid_input = False
+    # Create a custom style for buttons
+    style = ttk.Style()
+    style.configure("TButton", font=("Helvetica", 12))
 
-        while not valid_input:
-            try:
-                selection = input("Selection: ")
-                selection_int = int(selection)
-                if 1 <= selection_int <= len(data["otpauth"]):
-                    otp_entry = data["otpauth"][selection_int - 1]
-                    totp = get_totp(otp_entry["url"])
-                    pyperclip.copy(totp.now())
-                    print(f'Copied {totp.now()} for {otp_entry["name"]} to clipboard')
-                    valid_input = True
-                elif selection_int == 0:
-                    print("exiting...")
-                    exit(0)
-                else:
-                    print("Invalid input, please try again")
-            except ValueError:
-                print("Invalid input, please try again")
+    frame = tk.Frame(root)
+    frame.pack(padx=20, pady=20, fill=tk.BOTH, expand=True)
+
+    label = tk.Label(frame, text="Please select which two-factor code to copy:")
+    label.pack(pady=10)
+
+    listbox = tk.Listbox(frame, selectmode=tk.SINGLE, font=("Helvetica", 12))
+    listbox.pack(fill=tk.BOTH, expand=True)
+    listbox.bind("<Double-1>", lambda event: on_select(data, listbox))
+
+    scrollbar = tk.Scrollbar(listbox, orient=tk.VERTICAL)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.BOTH)
+
+    listbox.config(yscrollcommand=scrollbar.set)
+
+    for i, otp_entry in enumerate(data["otpauth"]):
+        listbox.insert(i, otp_entry["name"])
+
+    button_frame = tk.Frame(frame)
+    button_frame.pack(pady=10)
+
+    exit_button = ttk.Button(button_frame, text="Exit", command=root.destroy)
+    exit_button.pack(side=tk.LEFT, padx=10)
+
+    copy_button = ttk.Button(button_frame, text="Copy", command=lambda: on_select(data, listbox))
+    copy_button.pack(side=tk.LEFT, padx=10)
+
+    root.mainloop()
 
 
 if __name__ == '__main__':
