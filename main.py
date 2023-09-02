@@ -7,6 +7,102 @@ import urllib.parse
 import pyotp
 import pyperclip
 
+PARAM_SECRET = "secret"
+PARAM_ISSUER = "issuer"
+PARAM_ALGORITHM = "algorithm"
+
+
+class OtpData:
+    def __init__(self, otp_url):
+        self._otp_url = otp_url
+        self._title = ""
+        self._name = ""
+        self._organization = ""
+        self._secret = ""
+        self._issuer = ""
+        self._algorithm = ""
+
+        self._parse_otp_url()
+
+    def get_title(self) -> str:
+        return self._title
+
+    def set_title(self, title) -> any:
+        self._title = title
+        return self
+
+    def get_name(self) -> str:
+        return self._name
+
+    def get_organization(self) -> str:
+        return self._organization
+
+    def get_secret(self) -> str:
+        return self._secret
+
+    def get_issuer(self) -> str:
+        return self._issuer
+
+    def get_algorithm(self) -> str:
+        return self._algorithm
+
+    def _parse_otp_url(self):
+        parsed_url = urllib.parse.urlparse(self._otp_url)
+        query_params = urllib.parse.parse_qs(parsed_url.query)
+
+        if PARAM_SECRET not in query_params.keys():
+            raise Exception(f"Missing {PARAM_SECRET} parameter in otp URL")
+
+        if PARAM_ISSUER not in query_params.keys():
+            raise Exception(f"Missing {PARAM_ISSUER} parameter in otp URL")
+
+        url_components = parsed_url.path.split(":")
+        title = url_components[0][1:]
+        name_and_domain = url_components[1].split("@")
+        name = name_and_domain[0]
+        organization = name_and_domain[1]
+
+        self._title = title
+        self._name = name
+        self._organization = organization
+        self._secret = query_params.get(PARAM_SECRET)[0]
+        self._issuer = query_params.get(PARAM_ISSUER)[0]
+        self._algorithm = query_params.get(PARAM_ALGORITHM, [""])[0]
+
+
+class Model:
+    def __init__(self, data_source: str):
+        self.data_source = data_source
+
+    def _get_credentials_json(self) -> str:
+        if not os.path.exists(self.data_source):
+            return ""
+
+        with open(self.data_source) as credential_json_file:
+            return json.load(credential_json_file)
+
+    def get_all_otp_data(self) -> [OtpData]:
+        if not os.path.exists(self.data_source):
+            return []
+
+        with open(self.data_source) as credential_json_file:
+            data = json.load(credential_json_file)
+
+        all_otp_data = []
+        for info in data["otpauth"]:
+            all_otp_data.append(OtpData(info["url"]).set_title(info["name"]))
+        return all_otp_data
+
+
+class View:
+    def __init__(self):
+        pass
+
+
+class Controller:
+    def __init__(self):
+        pass
+
 
 def get_algorithms() -> dict:
     return {
@@ -16,43 +112,31 @@ def get_algorithms() -> dict:
     }
 
 
-def get_totp(otp_url: str) -> any:
-    parsed_url = urllib.parse.urlparse(otp_url)
-    query_params = urllib.parse.parse_qs(parsed_url.query)
-
+def copy_totp_top_clipboard(selected_entry: OtpData):
     algorithm = hashlib.sha1
 
     try:
-        issuer = query_params['issuer'][0]
-        secret_key = query_params['secret'][0]
-    except KeyError:
-        messagebox.showerror("Error", "corrupt data, issuer and secret must both be present")
-        return None
-
-    try:
-        encryption = query_params.get('algorithm', ['SHA1'])[0]
+        encryption = selected_entry.get_algorithm()
+        if encryption == "":
+            encryption = "SHA1"
         algorithms = get_algorithms()
         if encryption.upper() in algorithms:
             algorithm = algorithms[encryption.upper()]
     except KeyError:
         pass
 
-    totp = pyotp.TOTP(secret_key, issuer=issuer, digest=algorithm)
-    return totp
+    totp = pyotp.TOTP(selected_entry.get_secret(), issuer=selected_entry.get_issuer(), digest=algorithm)
 
-
-def copy_totp_top_clipboard(selected_entry):
-    totp = get_totp(selected_entry["url"])
     if totp:
         pyperclip.copy(totp.now())
-        messagebox.showinfo("Copy Complete", f'Copied {totp.now()} for {selected_entry["name"]} to clipboard')
+        messagebox.showinfo("Copy Complete", f'Copied {totp.now()} for {selected_entry.get_title()} to clipboard')
 
 
-def on_select(data, listbox):
+def on_select(data: [OtpData], listbox):
     selection = listbox.curselection()
     if selection:
         selected_index = selection[0]
-        selected_entry = data["otpauth"][int(selected_index)]
+        selected_entry = data[selected_index]
         copy_totp_top_clipboard(selected_entry)
 
 
@@ -60,8 +144,8 @@ def main():
     parent_dir = os.path.dirname(__file__)
     credential_path = os.path.join(parent_dir, "credentials.json")
 
-    with open(credential_path) as credential_json_file:
-        data = json.load(credential_json_file)
+    model = Model(credential_path)
+    otp_data = model.get_all_otp_data()
 
     root = tk.Tk()
     root.title("OTP Manager")
@@ -79,15 +163,15 @@ def main():
 
     listbox = tk.Listbox(frame, selectmode=tk.SINGLE, font=("Helvetica", 12))
     listbox.pack(fill=tk.BOTH, expand=True)
-    listbox.bind("<Double-1>", lambda event: on_select(data, listbox))
+    listbox.bind("<Double-1>", lambda event: on_select(otp_data, listbox))
 
     scrollbar = tk.Scrollbar(listbox, orient=tk.VERTICAL)
     scrollbar.pack(side=tk.RIGHT, fill=tk.BOTH)
 
     listbox.config(yscrollcommand=scrollbar.set)
 
-    for i, otp_entry in enumerate(data["otpauth"]):
-        listbox.insert(i, otp_entry["name"])
+    for i, data in enumerate(otp_data):
+        listbox.insert(i, data.get_title())
 
     button_frame = tk.Frame(frame)
     button_frame.pack(pady=10)
@@ -95,7 +179,7 @@ def main():
     exit_button = ttk.Button(button_frame, text="Exit", command=root.destroy)
     exit_button.pack(side=tk.LEFT, padx=10)
 
-    copy_button = ttk.Button(button_frame, text="Copy", command=lambda: on_select(data, listbox))
+    copy_button = ttk.Button(button_frame, text="Copy", command=lambda: on_select(otp_data, listbox))
     copy_button.pack(side=tk.LEFT, padx=10)
 
     root.mainloop()
