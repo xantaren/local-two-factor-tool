@@ -96,7 +96,26 @@ class Model:
 
 class View:
     def __init__(self):
-        pass
+        self.root = tk.Tk()
+        self.__configure_root_style()
+
+    def __configure_root_style(self):
+        style = ttk.Style(self.root)
+        style.configure("TButton", font=("Helvetica", 12))
+
+    def set_title(self, title: str):
+        self.root.title(title)
+        return self
+
+    def set_dimensions(self, dimension_literals: str):
+        self.root.geometry(dimension_literals)
+        return self
+
+    def get_root(self):
+        return self.root
+
+    def display(self):
+        self.root.mainloop()
 
 
 class Controller:
@@ -147,19 +166,14 @@ def main():
     model = Model(credential_path)
     otp_data = model.get_all_otp_data()
 
-    root = tk.Tk()
-    root.title("OTP Manager")
-    root.geometry("400x350")  # Set the initial window size
-
-    # Create a custom style for buttons
-    style = ttk.Style()
-    style.configure("TButton", font=("Helvetica", 12))
+    view = View()
+    root = view.set_title("OTP Manager").set_dimensions("400x350").get_root()
 
     frame = tk.Frame(root)
     frame.pack(padx=20, pady=20, fill=tk.BOTH, expand=True)
 
     label = tk.Label(frame, text="Please select which two-factor code to copy:")
-    label.pack(pady=10)
+    label.pack(pady=10, anchor="w")
 
     listbox = tk.Listbox(frame, selectmode=tk.SINGLE, font=("Helvetica", 12))
     listbox.pack(fill=tk.BOTH, expand=True)
