@@ -1,0 +1,4 @@
+pyotp==2.6.0
+pyperclip==1.8.2
+
+# for tkinter related errors, see: https://stackoverflow.com/questions/39928710/why-is-there-no-tkinter-distribution-found
