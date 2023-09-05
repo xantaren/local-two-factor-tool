@@ -58,13 +58,8 @@ class OtpData:
 
         url_components = parsed_url.path.split(":")
         title = url_components[0][1:]
-        name_and_domain = url_components[1].split("@")
-        name = name_and_domain[0]
-        organization = name_and_domain[1]
 
         self._title = title
-        self._name = name
-        self._organization = organization
         self._secret = query_params.get(PARAM_SECRET)[0]
         self._issuer = query_params.get(PARAM_ISSUER)[0]
         self._algorithm = query_params.get(PARAM_ALGORITHM, [""])[0]
